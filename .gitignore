@@ -5,11 +5,13 @@
 .DS_Store
 /build/
 /app/build/
+/app/release/
 /captures/
 .externalNativeBuild/
 .cxx/
 *.apk
 *.hprof
 keystore.properties
+signing-credentials.local.txt
 *.jks
 *.keystore
