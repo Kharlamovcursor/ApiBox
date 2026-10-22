@@ -1,0 +1,1 @@
+-keep class ru.hdlabs.apibox.data.local.** { *; }
