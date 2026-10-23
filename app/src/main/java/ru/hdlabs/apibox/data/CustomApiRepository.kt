@@ -3,6 +3,7 @@ package ru.hdlabs.apibox.data
 import kotlinx.coroutines.flow.Flow
 import ru.hdlabs.apibox.data.local.CustomApiDao
 import ru.hdlabs.apibox.data.local.CustomApiEntity
+import ru.hdlabs.apibox.domain.CustomApiPreset
 import java.util.UUID
 
 data class CustomDraft(
@@ -29,9 +30,44 @@ class CustomApiRepository(
 
     fun body(id: String): String = secrets.get(SecretKeys.body(id))
 
+    suspend fun ensureFromPreset(preset: CustomApiPreset): String {
+        if (customDao.get(preset.id) != null) return preset.id
+        return save(
+            CustomDraft(
+                id = preset.id,
+                name = preset.name,
+                url = preset.url,
+                method = "GET",
+                jsonPath = preset.jsonPath,
+                body = "",
+                headers = emptyList(),
+                onDesk = false,
+            ),
+        )
+    }
+
+    suspend fun setPresetOnDesk(preset: CustomApiPreset, enabled: Boolean) {
+        val id = ensureFromPreset(preset)
+        val existing = customDao.get(id) ?: return
+        save(
+            CustomDraft(
+                id = id,
+                name = existing.name,
+                url = existing.url,
+                method = existing.method,
+                jsonPath = existing.jsonPath,
+                body = body(id),
+                headers = headers(id),
+                onDesk = enabled,
+            ),
+        )
+    }
+
     suspend fun save(draft: CustomDraft): String {
         val existing = draft.id?.let { customDao.get(it) }
-        val id = existing?.id ?: UUID.randomUUID().toString()
+        val id = existing?.id
+            ?: draft.id?.trim()?.takeIf { it.isNotEmpty() }
+            ?: UUID.randomUUID().toString()
         customDao.upsert(
             CustomApiEntity(
                 id = id,

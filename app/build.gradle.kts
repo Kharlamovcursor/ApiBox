@@ -1,5 +1,17 @@
 import java.util.Properties
 
+fun gradleStringLiteral(value: String): String =
+    "\"" + value.replace("\\", "\\\\").replace("\"", "\\\"") + "\""
+
+val localProperties = Properties().apply {
+    val file = rootProject.file("local.properties")
+    if (file.exists()) {
+        load(file.reader())
+    }
+}
+
+fun localProp(key: String): String = localProperties.getProperty(key)?.trim() ?: ""
+
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.android)
@@ -15,12 +27,24 @@ android {
         applicationId = "ru.hdlabs.apibox"
         minSdk = 28
         targetSdk = 35
-        versionCode = 1
-        versionName = "1.0.0"
+        versionCode = 2
+        versionName = "1.1.0"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 
         buildConfigField("String", "GITHUB_RELEASES_OWNER", "\"Kharlamovcursor\"")
         buildConfigField("String", "GITHUB_RELEASES_REPO", "\"ApiBox\"")
+        buildConfigField(
+            "String",
+            "TELEGRAM_FEEDBACK_URL",
+            gradleStringLiteral(
+                localProp("telegram.feedback.url").ifBlank { "https://t.me/Yakofffff" },
+            ),
+        )
+        buildConfigField(
+            "String",
+            "TELEGRAM_FEEDBACK_BOT",
+            gradleStringLiteral(localProp("telegram.feedback.bot")),
+        )
     }
 
     signingConfigs {

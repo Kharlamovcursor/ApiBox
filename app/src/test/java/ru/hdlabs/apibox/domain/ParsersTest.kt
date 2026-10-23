@@ -17,6 +17,13 @@ class ParsersTest {
     }
 
     @Test
+    fun readsPresetRatePaths() {
+        assertEquals("81.2345", JsonPath.read(CBR_SNIPPET, "Valute.USD.Value"))
+        assertEquals("92.1", JsonPath.read(CBR_SNIPPET, "Valute.EUR.Value"))
+        assertEquals("81603", JsonPath.read(COINGECKO_BTC, "bitcoin.usd"))
+    }
+
+    @Test
     fun parsesImoex() {
         val quote = MoexQuotes.parse(IMOEX)
         requireNotNull(quote)
@@ -52,6 +59,9 @@ class ParsersTest {
     }
 
     private companion object {
+        const val CBR_SNIPPET = """{"Valute":{"USD":{"Value":81.2345},"EUR":{"Value":92.1}}}"""
+        const val COINGECKO_BTC = """{"bitcoin":{"usd":81603}}"""
+
         val IMOEX = """
             {
               "marketdata": {

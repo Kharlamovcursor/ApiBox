@@ -45,6 +45,7 @@ import ru.hdlabs.apibox.data.AccountDraft
 import ru.hdlabs.apibox.data.AppSettings
 import ru.hdlabs.apibox.data.CustomDraft
 import ru.hdlabs.apibox.data.local.AccountEntity
+import ru.hdlabs.apibox.domain.CustomApiPresets
 import ru.hdlabs.apibox.domain.MoexCatalog
 import ru.hdlabs.apibox.domain.PLATFORM_OZON
 import ru.hdlabs.apibox.domain.PLATFORM_WB
@@ -125,7 +126,8 @@ fun SettingsHomeScreen(
         }
         SectionLink("Индексы Мосбиржи", "IMOEX уже на столе, остальные включаются здесь", onMoex)
         SectionLink("Кабинеты маркетплейсов", "Ozon, Wildberries, Яндекс Маркет. Ключи только на телефоне", onAccounts)
-        SectionLink("Свои API", "HTTPS, заголовки и путь к значению в JSON", onCustom)
+        SectionLink("Свои API", "Курсы ЦБ и BTC, свои HTTPS и путь в JSON", onCustom)
+        TelegramFeedbackSection()
         AppUpdateSection()
     }
 }
@@ -356,26 +358,69 @@ fun AccountEditorScreen(existingId: String?, newPlatform: String, onBack: () -> 
 fun CustomListScreen(onBack: () -> Unit, onCreate: () -> Unit, onOpen: (String) -> Unit) {
     val container = rememberContainer()
     val apis by container.customApis.observe().collectAsStateWithLifecycle(initialValue = emptyList())
+    val scope = rememberCoroutineScope()
+    val customOnly = apis.filter { CustomApiPresets.find(it.id) == null }
     Column(Modifier.fillMaxSize().systemBarsPadding()) {
         HdTopBar(title = "Свои API", onBack = onBack)
-        if (apis.isEmpty()) {
-            Box(Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.Center) {
-                Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                    Text("Своих API пока нет", color = HdTextSecondary)
-                    HdButton("Добавить API", onCreate, modifier = Modifier.formWidth())
+        Column(
+            Modifier
+                .weight(1f)
+                .padding(horizontal = 16.dp, vertical = 8.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp),
+        ) {
+            Text("Стандартные курсы", color = HdTextSecondary, fontSize = 13.sp)
+            CustomApiPresets.all.forEach { preset ->
+                val stored = apis.find { it.id == preset.id }
+                Row(
+                    Modifier
+                        .fillMaxWidth()
+                        .deskSurface()
+                        .clickable {
+                            scope.launch {
+                                val id = container.customApis.ensureFromPreset(preset)
+                                onOpen(id)
+                            }
+                        }
+                        .padding(horizontal = 14.dp, vertical = 10.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Column(Modifier.weight(1f)) {
+                        Text(preset.name, color = HdTextPrimary, fontWeight = FontWeight.SemiBold)
+                        Text(preset.hint, color = HdTextSecondary, fontSize = 12.sp)
+                        Text(
+                            if (stored?.onDesk == true) "На рабочем столе" else "Нажмите, чтобы настроить",
+                            color = if (stored?.onDesk == true) HdUp else HdTextSecondary,
+                            fontSize = 12.sp,
+                        )
+                    }
+                    HdSwitch(
+                        checked = stored?.onDesk == true,
+                        onChecked = { enabled ->
+                            scope.launch { container.customApis.setPresetOnDesk(preset, enabled) }
+                        },
+                    )
                 }
             }
-        } else {
-            HdButton("Добавить API", onCreate, modifier = Modifier.padding(horizontal = 16.dp).formWidth())
-            Box(Modifier.weight(1f).fillMaxWidth().padding(horizontal = 16.dp, vertical = 12.dp)) {
-                DragList(
-                    items = apis,
-                    keyOf = { it.id },
-                    onOrder = { container.customApis.persistOrder(it) },
-                ) { api ->
-                    Column(Modifier.fillMaxSize().clickable { onOpen(api.id) }.padding(horizontal = 14.dp, vertical = 12.dp)) {
-                        Text(api.name, color = HdTextPrimary, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                        Text(if (api.onDesk) "На рабочем столе" else "Скрыт", color = HdTextSecondary, fontSize = 13.sp)
+            Text("Свои запросы", color = HdTextSecondary, fontSize = 13.sp, modifier = Modifier.padding(top = 8.dp))
+            HdButton("Добавить API", onCreate, modifier = Modifier.formWidth())
+            if (customOnly.isEmpty()) {
+                Text("Своих запросов пока нет", color = HdTextSecondary, fontSize = 13.sp)
+            } else {
+                Box(Modifier.weight(1f).fillMaxWidth()) {
+                    DragList(
+                        items = customOnly,
+                        keyOf = { it.id },
+                        onOrder = { container.customApis.persistOrder(it) },
+                    ) { api ->
+                        Column(
+                            Modifier
+                                .fillMaxSize()
+                                .clickable { onOpen(api.id) }
+                                .padding(horizontal = 14.dp, vertical = 12.dp),
+                        ) {
+                            Text(api.name, color = HdTextPrimary, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                            Text(if (api.onDesk) "На рабочем столе" else "Скрыт", color = HdTextSecondary, fontSize = 13.sp)
+                        }
                     }
                 }
             }
