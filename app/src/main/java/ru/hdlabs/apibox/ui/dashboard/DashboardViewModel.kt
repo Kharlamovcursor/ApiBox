@@ -11,12 +11,6 @@ import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import ru.hdlabs.apibox.AppContainer
-import ru.hdlabs.apibox.data.local.CustomApiEntity
-import ru.hdlabs.apibox.data.local.DeskItemEntity
-import ru.hdlabs.apibox.data.local.QuoteEntity
-import ru.hdlabs.apibox.domain.KIND_CUSTOM
-import ru.hdlabs.apibox.domain.KIND_MOEX
-import ru.hdlabs.apibox.domain.MoexCatalog
 import ru.hdlabs.apibox.domain.swapped
 
 data class DeskCard(
@@ -44,11 +38,7 @@ class DashboardViewModel(private val container: AppContainer) : ViewModel() {
         container.desk.observe(),
         container.desk.observeQuotes(),
         container.customApis.observe(),
-    ) { items, quotes, customs ->
-        val quoteById = quotes.associateBy { it.deskItemId }
-        val customById = customs.associateBy { it.id }
-        items.mapNotNull { item -> item.toCard(quoteById[item.id], customById) }
-    }
+    ) { items, quotes, customs -> buildDeskCards(items, quotes, customs) }
 
     val ui: StateFlow<DashboardUi> = combine(
         cards,
@@ -115,32 +105,3 @@ private fun arrange(cards: List<DeskCard>, order: List<String>?): List<DeskCard>
     return kept + rest
 }
 
-private fun DeskItemEntity.toCard(
-    quote: QuoteEntity?,
-    customs: Map<String, CustomApiEntity>,
-): DeskCard? {
-    val title: String
-    val subtitle: String
-    when (kind) {
-        KIND_MOEX -> {
-            val index = MoexCatalog.find(ref)
-            title = ref
-            subtitle = index?.title ?: ref
-        }
-        KIND_CUSTOM -> {
-            val api = customs[ref] ?: return null
-            title = api.name
-            subtitle = "Свой API"
-        }
-        else -> return null
-    }
-    return DeskCard(
-        id = id,
-        title = title,
-        subtitle = subtitle,
-        value = quote?.valueText ?: "…",
-        delta = quote?.deltaText.orEmpty(),
-        up = quote?.up,
-        footer = quote?.footer ?: "загрузка",
-    )
-}

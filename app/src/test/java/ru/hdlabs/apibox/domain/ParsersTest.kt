@@ -20,7 +20,10 @@ class ParsersTest {
     fun readsPresetRatePaths() {
         assertEquals("81.2345", JsonPath.read(CBR_SNIPPET, "Valute.USD.Value"))
         assertEquals("92.1", JsonPath.read(CBR_SNIPPET, "Valute.EUR.Value"))
+        assertEquals("11.5", JsonPath.read(CBR_SNIPPET, "Valute.CNY.Value"))
         assertEquals("81603", JsonPath.read(COINGECKO_BTC, "bitcoin.usd"))
+        assertEquals("-2.5", JsonPath.read(WEATHER_SNIPPET, "current.temperature_2m"))
+        assertEquals("18", JsonPath.read(AQI_SNIPPET, "current.european_aqi"))
     }
 
     @Test
@@ -59,8 +62,10 @@ class ParsersTest {
     }
 
     private companion object {
-        const val CBR_SNIPPET = """{"Valute":{"USD":{"Value":81.2345},"EUR":{"Value":92.1}}}"""
+        const val CBR_SNIPPET = """{"Valute":{"USD":{"Value":81.2345},"EUR":{"Value":92.1},"CNY":{"Value":11.5}}}"""
         const val COINGECKO_BTC = """{"bitcoin":{"usd":81603}}"""
+        const val WEATHER_SNIPPET = """{"current":{"temperature_2m":-2.5,"wind_speed_10m":12.3}}"""
+        const val AQI_SNIPPET = """{"current":{"european_aqi":18}}"""
 
         val IMOEX = """
             {

@@ -42,7 +42,9 @@ import androidx.lifecycle.repeatOnLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import kotlinx.coroutines.delay
 import ru.hdlabs.apibox.ui.components.DeskFace
+import ru.hdlabs.apibox.ui.components.HdButton
 import ru.hdlabs.apibox.ui.components.HdTopBar
+import ru.hdlabs.apibox.ui.components.formWidth
 import ru.hdlabs.apibox.ui.components.deskSurface
 import ru.hdlabs.apibox.ui.components.rememberContainer
 import ru.hdlabs.apibox.ui.reorder.ReorderDragHandle
@@ -54,7 +56,7 @@ import ru.hdlabs.apibox.ui.theme.HdTextSecondary
 import androidx.compose.material3.Text
 
 @Composable
-fun DashboardScreen(onSettings: () -> Unit) {
+fun DashboardScreen(onSettings: () -> Unit, onCatalog: () -> Unit) {
     val container = rememberContainer()
     val viewModel: DashboardViewModel = viewModel(factory = DashboardViewModel.factory(container))
     val ui by viewModel.ui.collectAsStateWithLifecycle()
@@ -94,11 +96,14 @@ fun DashboardScreen(onSettings: () -> Unit) {
         }
         if (ui.cards.isEmpty()) {
             Box(Modifier.fillMaxSize().padding(24.dp), contentAlignment = Alignment.Center) {
-                Text(
-                    "Включите индекс или добавьте свой API в настройках",
-                    color = HdTextSecondary,
-                    textAlign = TextAlign.Center,
-                )
+                Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    Text(
+                        "На столе пусто. Откройте каталог: курсы, погода Москвы и СПб, свои HTTPS.",
+                        color = HdTextSecondary,
+                        textAlign = TextAlign.Center,
+                    )
+                    HdButton("Каталог API", onCatalog, modifier = Modifier.formWidth())
+                }
             }
         } else if (ui.tiles) {
             BoxWithConstraints(Modifier.fillMaxSize()) {

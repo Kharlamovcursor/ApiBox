@@ -13,6 +13,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.systemBarsPadding
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.FilterChip
@@ -46,6 +47,7 @@ import ru.hdlabs.apibox.data.AppSettings
 import ru.hdlabs.apibox.data.CustomDraft
 import ru.hdlabs.apibox.data.local.AccountEntity
 import ru.hdlabs.apibox.domain.CustomApiPresets
+import ru.hdlabs.apibox.domain.KIND_CUSTOM
 import ru.hdlabs.apibox.domain.MoexCatalog
 import ru.hdlabs.apibox.domain.PLATFORM_OZON
 import ru.hdlabs.apibox.domain.PLATFORM_WB
@@ -80,6 +82,7 @@ fun SettingsHomeScreen(
     onMoex: () -> Unit,
     onAccounts: () -> Unit,
     onCustom: () -> Unit,
+    onDeskStatus: () -> Unit,
 ) {
     val container = rememberContainer()
     val settings by container.settings.settings.collectAsStateWithLifecycle(initialValue = AppSettings())
@@ -124,9 +127,10 @@ fun SettingsHomeScreen(
             }
             HdSwitch(checked = settings.powerSave, onChecked = { scope.launch { container.settings.setPowerSave(it) } })
         }
+        SectionLink("Каталог API", "Курсы, погода Москвы и СПб — переключатель сразу на стол", onCustom)
+        SectionLink("Статус виджетов", "Проверка всех плиток: значение, ошибка, обновить", onDeskStatus)
         SectionLink("Индексы Мосбиржи", "IMOEX уже на столе, остальные включаются здесь", onMoex)
         SectionLink("Кабинеты маркетплейсов", "Ozon, Wildberries, Яндекс Маркет. Ключи только на телефоне", onAccounts)
-        SectionLink("Свои API", "Курсы ЦБ и BTC, свои HTTPS и путь в JSON", onCustom)
         TelegramFeedbackSection()
         AppUpdateSection()
     }
@@ -358,74 +362,140 @@ fun AccountEditorScreen(existingId: String?, newPlatform: String, onBack: () -> 
 fun CustomListScreen(onBack: () -> Unit, onCreate: () -> Unit, onOpen: (String) -> Unit) {
     val container = rememberContainer()
     val apis by container.customApis.observe().collectAsStateWithLifecycle(initialValue = emptyList())
+    val deskItems by container.desk.observe().collectAsStateWithLifecycle(initialValue = emptyList())
+    val quotes by container.desk.observeQuotes().collectAsStateWithLifecycle(initialValue = emptyList())
     val scope = rememberCoroutineScope()
     val customOnly = apis.filter { CustomApiPresets.find(it.id) == null }
+    val quoteByDesk = quotes.associateBy { it.deskItemId }
+    val onDeskPresets = apis.count { CustomApiPresets.find(it.id) != null && it.onDesk }
+
     Column(Modifier.fillMaxSize().systemBarsPadding()) {
-        HdTopBar(title = "Свои API", onBack = onBack)
-        Column(
-            Modifier
-                .weight(1f)
-                .padding(horizontal = 16.dp, vertical = 8.dp),
+        HdTopBar(title = "Каталог API", onBack = onBack)
+        LazyColumn(
+            modifier = Modifier.weight(1f),
+            contentPadding = PaddingValues(16.dp),
             verticalArrangement = Arrangement.spacedBy(10.dp),
         ) {
-            Text("Стандартные курсы", color = HdTextSecondary, fontSize = 13.sp)
-            CustomApiPresets.all.forEach { preset ->
-                val stored = apis.find { it.id == preset.id }
-                Row(
-                    Modifier
-                        .fillMaxWidth()
-                        .deskSurface()
-                        .clickable {
+            item {
+                Column(
+                    Modifier.fillMaxWidth().deskSurface().padding(16.dp),
+                    verticalArrangement = Arrangement.spacedBy(6.dp),
+                ) {
+                    Text("Как пользоваться", color = HdTextPrimary, fontWeight = FontWeight.SemiBold, fontSize = 16.sp)
+                    Text(
+                        "Переключатель справа — сразу на рабочий стол. Нажатие на строку — проверка запроса и правка URL или пути JSON.",
+                        color = HdTextSecondary,
+                        fontSize = 13.sp,
+                    )
+                    Text(
+                        "Из каталога на столе: $onDeskPresets из ${CustomApiPresets.all.size}",
+                        color = HdBlue,
+                        fontSize = 13.sp,
+                    )
+                }
+            }
+            CustomApiPresets.byCategory().forEach { (category, presets) ->
+                item(key = "hdr-${category.name}") {
+                    Column(Modifier.padding(top = 4.dp)) {
+                        Text(category.title, color = HdTextPrimary, fontWeight = FontWeight.Bold, fontSize = 15.sp)
+                        Text(category.about, color = HdTextSecondary, fontSize = 12.sp)
+                    }
+                }
+                items(presets, key = { it.id }) { preset ->
+                    PresetCatalogRow(
+                        preset = preset,
+                        stored = apis.find { it.id == preset.id },
+                        preview = presetLivePreview(preset.id, deskItems, quoteByDesk, preset.unit),
+                        onOpen = {
                             scope.launch {
                                 val id = container.customApis.ensureFromPreset(preset)
                                 onOpen(id)
                             }
-                        }
-                        .padding(horizontal = 14.dp, vertical = 10.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    Column(Modifier.weight(1f)) {
-                        Text(preset.name, color = HdTextPrimary, fontWeight = FontWeight.SemiBold)
-                        Text(preset.hint, color = HdTextSecondary, fontSize = 12.sp)
-                        Text(
-                            if (stored?.onDesk == true) "На рабочем столе" else "Нажмите, чтобы настроить",
-                            color = if (stored?.onDesk == true) HdUp else HdTextSecondary,
-                            fontSize = 12.sp,
-                        )
-                    }
-                    HdSwitch(
-                        checked = stored?.onDesk == true,
-                        onChecked = { enabled ->
+                        },
+                        onToggle = { enabled ->
                             scope.launch { container.customApis.setPresetOnDesk(preset, enabled) }
                         },
                     )
                 }
             }
-            Text("Свои запросы", color = HdTextSecondary, fontSize = 13.sp, modifier = Modifier.padding(top = 8.dp))
-            HdButton("Добавить API", onCreate, modifier = Modifier.formWidth())
+            item {
+                Column(Modifier.padding(top = 8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text("Свои HTTPS-запросы", color = HdTextPrimary, fontWeight = FontWeight.Bold, fontSize = 15.sp)
+                    Text("Любой JSON по https, заголовки хранятся на телефоне", color = HdTextSecondary, fontSize = 12.sp)
+                    HdButton("Добавить свой API", onCreate, modifier = Modifier.formWidth())
+                }
+            }
             if (customOnly.isEmpty()) {
-                Text("Своих запросов пока нет", color = HdTextSecondary, fontSize = 13.sp)
+                item {
+                    Text("Своих запросов пока нет", color = HdTextSecondary, fontSize = 13.sp)
+                }
             } else {
-                Box(Modifier.weight(1f).fillMaxWidth()) {
-                    DragList(
-                        items = customOnly,
-                        keyOf = { it.id },
-                        onOrder = { container.customApis.persistOrder(it) },
-                    ) { api ->
-                        Column(
-                            Modifier
-                                .fillMaxSize()
-                                .clickable { onOpen(api.id) }
-                                .padding(horizontal = 14.dp, vertical = 12.dp),
-                        ) {
-                            Text(api.name, color = HdTextPrimary, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                            Text(if (api.onDesk) "На рабочем столе" else "Скрыт", color = HdTextSecondary, fontSize = 13.sp)
+                item {
+                    Box(Modifier.fillMaxWidth().height((customOnly.size * 106).coerceAtMost(420).dp)) {
+                        DragList(
+                            items = customOnly,
+                            keyOf = { it.id },
+                            onOrder = { container.customApis.persistOrder(it) },
+                        ) { api ->
+                            Column(
+                                Modifier
+                                    .fillMaxSize()
+                                    .clickable { onOpen(api.id) }
+                                    .padding(horizontal = 14.dp, vertical = 12.dp),
+                            ) {
+                                Text(api.name, color = HdTextPrimary, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                                Text(if (api.onDesk) "На рабочем столе" else "Скрыт", color = HdTextSecondary, fontSize = 13.sp)
+                            }
                         }
                     }
                 }
             }
         }
     }
+}
+
+@Composable
+private fun PresetCatalogRow(
+    preset: ru.hdlabs.apibox.domain.CustomApiPreset,
+    stored: ru.hdlabs.apibox.data.local.CustomApiEntity?,
+    preview: String?,
+    onOpen: () -> Unit,
+    onToggle: (Boolean) -> Unit,
+) {
+    Row(
+        Modifier
+            .fillMaxWidth()
+            .deskSurface()
+            .clickable(onClick = onOpen)
+            .padding(horizontal = 14.dp, vertical = 10.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+            Text(preset.name, color = HdTextPrimary, fontWeight = FontWeight.SemiBold)
+            Text("${preset.source} · ${preset.hint}", color = HdTextSecondary, fontSize = 12.sp, maxLines = 2, overflow = TextOverflow.Ellipsis)
+            when {
+                preview != null -> Text("Сейчас: $preview", color = HdUp, fontSize = 12.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                stored?.onDesk == true -> Text("На столе, ждём ответ…", color = HdTextSecondary, fontSize = 12.sp)
+                else -> Text("Выключено", color = HdTextSecondary, fontSize = 12.sp)
+            }
+        }
+        HdSwitch(checked = stored?.onDesk == true, onChecked = onToggle)
+    }
+}
+
+private fun presetLivePreview(
+    presetId: String,
+    deskItems: List<ru.hdlabs.apibox.data.local.DeskItemEntity>,
+    quoteByDesk: Map<String, ru.hdlabs.apibox.data.local.QuoteEntity>,
+    unit: String,
+): String? {
+    val deskId = deskItems.find { it.kind == KIND_CUSTOM && it.ref == presetId }?.id ?: return null
+    val quote = quoteByDesk[deskId] ?: return null
+    if (quote.valueText == "—" || quote.valueText == "…") {
+        return quote.footer.takeIf { it.isNotBlank() && it != "загрузка" }
+    }
+    val suffix = if (unit.isNotBlank()) " $unit" else ""
+    return quote.valueText + suffix
 }
 
 private class HeaderField(name: String, value: String) {
@@ -483,8 +553,17 @@ fun CustomEditorScreen(existingId: String?, onBack: () -> Unit) {
         onDesk = onDesk,
     )
 
-    ToolPage(title = if (apiId == null) "Новый API" else "Свой API", onBack = onBack) {
-        Text("Только https. Значение для плитки берётся по пути, например data.price или items[0].value.", color = HdTextSecondary, fontSize = 13.sp)
+    val preset = apiId?.let { CustomApiPresets.find(it) }
+    ToolPage(title = preset?.name ?: if (apiId == null) "Новый API" else "Свой API", onBack = onBack) {
+        if (preset != null) {
+            Text(
+                "Шаблон из каталога · ${preset.source}. ${preset.hint}",
+                color = HdTextSecondary,
+                fontSize = 13.sp,
+            )
+        } else {
+            Text("Только https. Значение для плитки берётся по пути, например data.price или items[0].value.", color = HdTextSecondary, fontSize = 13.sp)
+        }
         HdField(name, { name = it }, "Название")
         HdField(url, { url = it }, "Адрес", keyboard = KeyboardType.Uri)
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {

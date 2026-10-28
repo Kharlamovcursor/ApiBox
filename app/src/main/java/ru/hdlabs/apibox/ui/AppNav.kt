@@ -15,6 +15,7 @@ import ru.hdlabs.apibox.ui.settings.AccountEditorScreen
 import ru.hdlabs.apibox.ui.settings.AccountsScreen
 import ru.hdlabs.apibox.ui.settings.CustomEditorScreen
 import ru.hdlabs.apibox.ui.settings.CustomListScreen
+import ru.hdlabs.apibox.ui.settings.DeskStatusScreen
 import ru.hdlabs.apibox.ui.settings.MoexScreen
 import ru.hdlabs.apibox.ui.settings.SettingsHomeScreen
 
@@ -25,7 +26,10 @@ fun AppNavHost() {
         SpaceBackground()
         NavHost(navController = nav, startDestination = "dashboard", modifier = Modifier.fillMaxSize()) {
             composable("dashboard") {
-                DashboardScreen(onSettings = { nav.navigate("settings") })
+                DashboardScreen(
+                    onSettings = { nav.navigate("settings") },
+                    onCatalog = { nav.navigate("custom") },
+                )
             }
             composable("settings") {
                 SettingsHomeScreen(
@@ -33,6 +37,13 @@ fun AppNavHost() {
                     onMoex = { nav.navigate("moex") },
                     onAccounts = { nav.navigate("accounts") },
                     onCustom = { nav.navigate("custom") },
+                    onDeskStatus = { nav.navigate("desk-status") },
+                )
+            }
+            composable("desk-status") {
+                DeskStatusScreen(
+                    onBack = { nav.popBackStack() },
+                    onOpenCatalog = { nav.navigate("custom") },
                 )
             }
             composable("moex") { MoexScreen(onBack = { nav.popBackStack() }) }
